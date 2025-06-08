@@ -133,7 +133,7 @@ def main():
     # id(task)_arch_dataset_epochs
     wandb.init(project="Baseline", 
                config=args, 
-               name=f"Pretrained_{args.id}_{args.arch}_{args.batch_size}_{args.mask_mode}_Student_{args.alpha}_{args.dataset}_{args.epochs}"
+               name=f"Pretrained_{args.id}_{args.arch}_{args.batch_size}_{args.mask_mode}_Student_{args.alpha}_{args.dataset}_lr{args.lr}_ep{args.epochs}"
                ,tags=[f"{args.id}",f"{args.dataset}","Pretrained",f"{args.mask_mode}"])
     if args.seed is not None:
         random.seed(args.seed)
@@ -145,8 +145,10 @@ def main():
     #     warnings.warn('You have chosen a specific GPU. This will completely '
     #                   'disable data parallelism.')
     if args.dataset == "TinyImageNet":
+        # args.num_cluster = "2,5,10"
         args.num_cluster = "200,500,1000"
         args.pcl_r = 16384
+        # args.pcl_r = 256
         args.num_classes = 200
     elif args.dataset == "CIFAR10":
         args.num_cluster = "10,100,300"
@@ -361,17 +363,30 @@ def main_worker(gpu, ngpus_per_node, args):
     print("checkpoint_path:",checkpoint_path)
     checkpoint = torch.load(checkpoint_path, map_location="cpu",weights_only=True)
     state_dict = checkpoint["state_dict"]
-    # Print all keys in the state_dict
-    print("Keys in the state_dict:")
-    for key in state_dict.keys():  
-        print(key)
-    # 處理權重名稱
+    # # Print all keys in the state_dict
+    # print("Keys in the state_dict:")
+    # for key in state_dict.keys():  
+    #     print(key)
+    # # 處理權重名稱
+    # new_state_dict = {}
+    # for k in list(state_dict.keys()):
+    #     if k.startswith("encoder_q."):
+    #         new_state_dict[f"encoder_q.{k[len('encoder_q.'):]}"] = state_dict[k]
+    #     elif k.startswith("encoder_k."):
+    #         new_state_dict[f"encoder_k.{k[len('encoder_k.'):]}"] = state_dict[k]
+    
+    # 處理權重名稱（去掉 'module.' 前綴）
     new_state_dict = {}
     for k in list(state_dict.keys()):
-        if k.startswith("encoder_q."):
-            new_state_dict[f"encoder_q.{k[len('encoder_q.'):]}"] = state_dict[k]
-        elif k.startswith("encoder_k."):
-            new_state_dict[f"encoder_k.{k[len('encoder_k.'):]}"] = state_dict[k]
+        clean_key = k
+        # if clean_key.startswith("module."):
+        #     clean_key = clean_key[len("module."):]
+        
+        if clean_key.startswith("encoder_q."):
+            new_state_dict[f"encoder_q.{clean_key[len('encoder_q.'):] }"] = state_dict[k]
+        elif clean_key.startswith("encoder_k."):
+            new_state_dict[f"encoder_k.{clean_key[len('encoder_k.'):] }"] = state_dict[k]
+    
     # Print all keys in the state_dict
     # print("Keys in the  new state_dict:")
     # for key in new_state_dict.keys():
@@ -409,10 +424,14 @@ def main_worker(gpu, ngpus_per_node, args):
         adjust_learning_rate(optimizer, epoch, args)
         train_loss = train(train_loader, model,teacher_model, criterion, optimizer, epoch, args, cluster_result,class_centroids)
         # train(train_loader, model,teacher_model, criterion, optimizer, epoch, args, cluster_result)
-        is_best = train_loss < best_loss
-        if is_best:
-            best_loss = train_loss
-            print(f"New best model found at epoch {epoch} with loss {train_loss:.4f}")
+        
+        # update best_loss after warmup_epoch
+        if epoch >= args.warmup_epoch:
+            is_best = train_loss < best_loss
+            if is_best:
+                best_loss = train_loss
+                print(f"New best model found at epoch {epoch} with loss {train_loss:.4f}")
+        
         # if (epoch + 1) % 5 == 0:
         save_checkpoint(args,{
             'epoch': epoch + 1,
@@ -733,12 +752,17 @@ def run_kmeans(features, args):
         print(f"Cluster assignments (first 10): {im2cluster[:10]}")  # 確認分群結果
         print(f"Applying masking with mode: {args.mask_mode}")  # 確認遮罩模式
 
-        # 應用遮罩策略，更新 masked_features
-        masked_features = apply_masking(
-            masked_features.cpu().numpy(),
-            cluster_assignments=im2cluster,
-            args=args
-        )
+        if args.use_masking:
+            print(f"Applying masking with mode: {args.mask_mode}")  # 確認遮罩模式
+            masked_features = apply_masking(
+                masked_features.cpu().numpy(),
+                cluster_assignments=im2cluster,
+                args=args
+            )
+            masked_features = torch.tensor(masked_features).cuda()
+        else:
+            print("Skipping masking due to --use-masking being False")
+
         masked_features = torch.tensor(masked_features).cuda()  # 轉換為 PyTorch 張量
         print(f"Masked features (first row): {masked_features[0].cpu().numpy()}")  # 確認遮罩效果
         # 更新聚類結果
