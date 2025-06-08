@@ -416,6 +416,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     for epoch in range(args.start_epoch, args.epochs):
         cluster_result = None
+        is_best = False
         if epoch >= args.warmup_epoch:
             # cluster_result
             features = compute_features(eval_loader, model, args)
