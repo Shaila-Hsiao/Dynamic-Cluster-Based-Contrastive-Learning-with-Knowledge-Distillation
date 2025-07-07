@@ -103,7 +103,7 @@ parser.add_argument("--alpha", default=1, type=float, help="student weight")
 # mask strategy
 parser.add_argument('--mask_mode', default='mask_farthest', type=str, choices=['mask_farthest', 'mask_threshold', 'mask_proportion'],
                     help='選擇遮罩模式：mask_farthest, mask_threshold, 或 mask_proportion')
-parser.add_argument('--dist_threshold', default=0.3, type=float,
+parser.add_argument('--dist_threshold', default=1.0, type=float,
                     help='指定 mask_threshold ')
 parser.add_argument('--proportion', default=0.1, type=float,
                     help='指定 mask_proportion 模式中遮罩的比例')
