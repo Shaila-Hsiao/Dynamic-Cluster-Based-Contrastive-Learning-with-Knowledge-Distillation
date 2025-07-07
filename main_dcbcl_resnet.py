@@ -123,7 +123,7 @@ parser.add_argument('--use-centroid', action='store_true', help='是否啟用質
 parser.add_argument('--use-masking', action='store_true', help='是否啟用 clustering masking')
 
 parser.add_argument('--student-ratio', default='60%', type=str,
-                    choices=['80%', '60%', '40%', '20%'],
+                    choices=['100%','80%', '60%', '40%', '20%'],
                     help='Student network block ratio')
 
 
