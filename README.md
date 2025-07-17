@@ -1,4 +1,4 @@
-## 📘 Dynamic Cluster-Based Contrastive Learning with Knowledge Distillation
+## 📘 Dynamic Centroid-Based Contrastive Learning with Knowledge Distillation
 
 <img src="./img/DCBCL_framework.png" width="600">
 
